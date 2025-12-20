@@ -28,7 +28,6 @@ h1 {
   border-radius: 6px;
   background: #2563eb;
   color: white;
-  font-size: 14px;
 }
 
 .board {
@@ -45,9 +44,14 @@ h1 {
   padding: 10px;
 }
 
-.column h2 {
+.column-header {
   text-align: center;
   font-size: 16px;
+  cursor: grab;
+}
+
+.column-header[contenteditable="true"] {
+  outline: 1px dashed #64748b;
 }
 
 .cards {
@@ -86,39 +90,42 @@ h1 {
   <button onclick="addColumn()">+ Nova coluna</button>
 </div>
 
-<div class="board" id="board"></div>
+<div class="board" id="board" ondragover="allowDrop(event)" ondrop="dropColumn(event)"></div>
 
 <script>
 let columnCount = 0;
 const maxColumns = 15;
 let draggedCard = null;
+let draggedColumn = null;
 
-/* CRIA COLUNA */
+/* ADICIONA COLUNA */
 function addColumn() {
   if (columnCount >= maxColumns) {
     alert("Limite máximo de 15 colunas atingido.");
     return;
   }
 
-  const name = prompt("Nome da coluna:");
-  if (!name) return;
-
   const column = document.createElement("div");
   column.className = "column";
+  column.draggable = true;
 
-  const title = document.createElement("h2");
-  title.textContent = name;
+  column.ondragstart = () => draggedColumn = column;
+
+  const header = document.createElement("div");
+  header.className = "column-header";
+  header.contentEditable = true;
+  header.textContent = "Nova coluna";
 
   const cards = document.createElement("div");
   cards.className = "cards";
   cards.ondragover = e => e.preventDefault();
-  cards.ondrop = e => drop(e, name.toLowerCase() === "concluído");
+  cards.ondrop = e => dropCard(e, header);
 
   const btn = document.createElement("button");
   btn.textContent = "+ Nova tarefa";
   btn.onclick = () => addCard(cards);
 
-  column.appendChild(title);
+  column.appendChild(header);
   column.appendChild(cards);
   column.appendChild(btn);
 
@@ -126,7 +133,7 @@ function addColumn() {
   columnCount++;
 }
 
-/* CRIA CARTÃO */
+/* ADICIONA CARTÃO */
 function addCard(container) {
   const card = document.createElement("div");
   card.className = "card";
@@ -140,15 +147,33 @@ function addCard(container) {
 }
 
 /* SOLTAR CARTÃO */
-function drop(ev, isDone) {
+function dropCard(ev, header) {
   ev.preventDefault();
   if (!draggedCard) return;
 
   draggedCard.classList.remove("done");
-  if (isDone) draggedCard.classList.add("done");
+
+  if (header.textContent.toLowerCase().includes("conclu")) {
+    draggedCard.classList.add("done");
+    alert("✅ Tarefa concluída!");
+  }
 
   ev.target.appendChild(draggedCard);
   draggedCard = null;
+}
+
+/* MOVER COLUNAS */
+function allowDrop(ev) {
+  ev.preventDefault();
+}
+
+function dropColumn(ev) {
+  ev.preventDefault();
+  if (!draggedColumn) return;
+
+  const board = document.getElementById("board");
+  board.appendChild(draggedColumn);
+  draggedColumn = null;
 }
 
 /* COLUNA INICIAL */
