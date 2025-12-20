@@ -1,67 +1,80 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <title>Meu Planejador</title>
-  <style>
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      background: #0f172a;
-      color: white;
-    }
+<meta charset="UTF-8">
+<title>Meu Planejador</title>
 
-    h1 {
-      text-align: center;
-      padding: 16px;
-    }
+<style>
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #0f172a;
+  color: white;
+}
 
-    .board {
-      display: flex;
-      gap: 12px;
-      padding: 12px;
-      overflow-x: auto;
-    }
+h1 {
+  text-align: center;
+  padding: 16px;
+}
 
-    .column {
-      background: #1e293b;
-      min-width: 260px;
-      border-radius: 10px;
-      padding: 10px;
-    }
+.board {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  overflow-x: auto;
+}
 
-    .column h2 {
-      text-align: center;
-      font-size: 18px;
-    }
+.column {
+  background: #1e293b;
+  min-width: 260px;
+  border-radius: 10px;
+  padding: 10px;
+}
 
-    .card {
-      background: #334155;
-      padding: 10px;
-      margin: 8px 0;
-      border-radius: 8px;
-      cursor: grab;
-    }
-  </style>
+.column h2 {
+  text-align: center;
+  font-size: 18px;
+}
+
+.cards {
+  min-height: 50px;
+}
+
+.card {
+  background: #334155;
+  padding: 10px;
+  margin: 8px 0;
+  border-radius: 8px;
+  cursor: grab;
+}
+
+.card:active {
+  cursor: grabbing;
+}
+</style>
 </head>
+
 <body>
 
 <h1>📋 Meu Planejador</h1>
 
 <div class="board">
+
   <div class="column">
     <h2>📝 A Fazer</h2>
-    <div class="card">Exemplo de tarefa</div>
+    <div class="cards" ondrop="drop(event)" ondragover="allowDrop(event)">
+      <div class="card" draggable="true" ondragstart="drag(event)" contenteditable="true">
+        Clique aqui para editar a tarefa
+      </div>
+    </div>
   </div>
 
   <div class="column">
     <h2>🔄 Em Andamento</h2>
+    <div class="cards" ondrop="drop(event)" ondragover="allowDrop(event)"></div>
   </div>
 
   <div class="column">
     <h2>✅ Concluído</h2>
+    <div class="cards" ondrop="drop(event)" ondragover="allowDrop(event)"></div>
   </div>
-</div>
-
-</body>
-</html>
