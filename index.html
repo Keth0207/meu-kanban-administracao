@@ -14,7 +14,21 @@ body {
 
 h1 {
   text-align: center;
-  padding: 12px;
+  padding: 10px;
+}
+
+.top-actions {
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.top-actions button {
+  padding: 8px 12px;
+  border: none;
+  border-radius: 6px;
+  background: #2563eb;
+  color: white;
+  font-size: 14px;
 }
 
 .board {
@@ -37,8 +51,7 @@ h1 {
 }
 
 .cards {
-  min-height: 80px;
-  padding: 5px;
+  min-height: 60px;
 }
 
 .card {
@@ -51,18 +64,16 @@ h1 {
 
 .card.done {
   background: #16a34a;
-  color: white;
 }
 
-button {
+.column button {
   width: 100%;
-  margin-top: 8px;
-  padding: 8px;
+  margin-top: 6px;
+  padding: 6px;
   border: none;
   border-radius: 6px;
-  background: #2563eb;
+  background: #475569;
   color: white;
-  font-size: 14px;
 }
 </style>
 </head>
@@ -71,69 +82,77 @@ button {
 
 <h1>📋 Meu Planejador</h1>
 
-<div class="board">
-
-<!-- COLUNA 1 -->
-<div class="column">
-  <h2>📝 A Fazer</h2>
-  <div class="cards" ondragover="allowDrop(event)" ondrop="drop(event, false)">
-  </div>
-  <button onclick="addCard()">+ Nova Tarefa</button>
+<div class="top-actions">
+  <button onclick="addColumn()">+ Nova coluna</button>
 </div>
 
-<!-- COLUNAS INTERMEDIÁRIAS -->
-<script>
-for (let i = 2; i <= 9; i++) {
-  document.write(`
-  <div class="column">
-    <h2>Coluna ${i}</h2>
-    <div class="cards" ondragover="allowDrop(event)" ondrop="drop(event, false)"></div>
-  </div>
-  `);
-}
-</script>
-
-<!-- COLUNA FINAL -->
-<div class="column">
-  <h2>✅ Concluído</h2>
-  <div class="cards" ondragover="allowDrop(event)" ondrop="drop(event, true)"></div>
-</div>
-
-</div>
+<div class="board" id="board"></div>
 
 <script>
+let columnCount = 0;
+const maxColumns = 15;
 let draggedCard = null;
-let idCounter = 0;
 
-function addCard() {
+/* CRIA COLUNA */
+function addColumn() {
+  if (columnCount >= maxColumns) {
+    alert("Limite máximo de 15 colunas atingido.");
+    return;
+  }
+
+  const name = prompt("Nome da coluna:");
+  if (!name) return;
+
+  const column = document.createElement("div");
+  column.className = "column";
+
+  const title = document.createElement("h2");
+  title.textContent = name;
+
+  const cards = document.createElement("div");
+  cards.className = "cards";
+  cards.ondragover = e => e.preventDefault();
+  cards.ondrop = e => drop(e, name.toLowerCase() === "concluído");
+
+  const btn = document.createElement("button");
+  btn.textContent = "+ Nova tarefa";
+  btn.onclick = () => addCard(cards);
+
+  column.appendChild(title);
+  column.appendChild(cards);
+  column.appendChild(btn);
+
+  document.getElementById("board").appendChild(column);
+  columnCount++;
+}
+
+/* CRIA CARTÃO */
+function addCard(container) {
   const card = document.createElement("div");
   card.className = "card";
-  card.id = "card-" + idCounter++;
-  card.draggable = true;
-  card.contentEditable = true;
   card.textContent = "Nova tarefa";
+  card.contentEditable = true;
+  card.draggable = true;
+
   card.ondragstart = () => draggedCard = card;
 
-  document.querySelector(".cards").appendChild(card);
+  container.appendChild(card);
 }
 
-function allowDrop(ev) {
-  ev.preventDefault();
-}
-
+/* SOLTAR CARTÃO */
 function drop(ev, isDone) {
   ev.preventDefault();
   if (!draggedCard) return;
 
   draggedCard.classList.remove("done");
-
-  if (isDone) {
-    draggedCard.classList.add("done");
-  }
+  if (isDone) draggedCard.classList.add("done");
 
   ev.target.appendChild(draggedCard);
   draggedCard = null;
 }
+
+/* COLUNA INICIAL */
+addColumn();
 </script>
 
 </body>
