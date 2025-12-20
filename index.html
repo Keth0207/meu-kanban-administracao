@@ -14,7 +14,7 @@ body {
 
 h1 {
   text-align: center;
-  padding: 16px;
+  padding: 12px;
 }
 
 .board {
@@ -26,18 +26,19 @@ h1 {
 
 .column {
   background: #1e293b;
-  min-width: 260px;
+  min-width: 240px;
   border-radius: 10px;
   padding: 10px;
 }
 
 .column h2 {
   text-align: center;
-  font-size: 18px;
+  font-size: 16px;
 }
 
 .cards {
-  min-height: 50px;
+  min-height: 80px;
+  padding: 5px;
 }
 
 .card {
@@ -48,8 +49,20 @@ h1 {
   cursor: grab;
 }
 
-.card:active {
-  cursor: grabbing;
+.card.done {
+  background: #16a34a;
+  color: white;
+}
+
+button {
+  width: 100%;
+  margin-top: 8px;
+  padding: 8px;
+  border: none;
+  border-radius: 6px;
+  background: #2563eb;
+  color: white;
+  font-size: 14px;
 }
 </style>
 </head>
@@ -60,21 +73,68 @@ h1 {
 
 <div class="board">
 
-  <div class="column">
-    <h2>📝 A Fazer</h2>
-    <div class="cards" ondrop="drop(event)" ondragover="allowDrop(event)">
-      <div class="card" draggable="true" ondragstart="drag(event)" contenteditable="true">
-        Clique aqui para editar a tarefa
-      </div>
-    </div>
+<!-- COLUNA 1 -->
+<div class="column">
+  <h2>📝 A Fazer</h2>
+  <div class="cards" ondragover="allowDrop(event)" ondrop="drop(event, false)">
   </div>
+  <button onclick="addCard()">+ Nova Tarefa</button>
+</div>
 
+<!-- COLUNAS INTERMEDIÁRIAS -->
+<script>
+for (let i = 2; i <= 9; i++) {
+  document.write(`
   <div class="column">
-    <h2>🔄 Em Andamento</h2>
-    <div class="cards" ondrop="drop(event)" ondragover="allowDrop(event)"></div>
+    <h2>Coluna ${i}</h2>
+    <div class="cards" ondragover="allowDrop(event)" ondrop="drop(event, false)"></div>
   </div>
+  `);
+}
+</script>
 
-  <div class="column">
-    <h2>✅ Concluído</h2>
-    <div class="cards" ondrop="drop(event)" ondragover="allowDrop(event)"></div>
-  </div>
+<!-- COLUNA FINAL -->
+<div class="column">
+  <h2>✅ Concluído</h2>
+  <div class="cards" ondragover="allowDrop(event)" ondrop="drop(event, true)"></div>
+</div>
+
+</div>
+
+<script>
+let draggedCard = null;
+let idCounter = 0;
+
+function addCard() {
+  const card = document.createElement("div");
+  card.className = "card";
+  card.id = "card-" + idCounter++;
+  card.draggable = true;
+  card.contentEditable = true;
+  card.textContent = "Nova tarefa";
+  card.ondragstart = () => draggedCard = card;
+
+  document.querySelector(".cards").appendChild(card);
+}
+
+function allowDrop(ev) {
+  ev.preventDefault();
+}
+
+function drop(ev, isDone) {
+  ev.preventDefault();
+  if (!draggedCard) return;
+
+  draggedCard.classList.remove("done");
+
+  if (isDone) {
+    draggedCard.classList.add("done");
+  }
+
+  ev.target.appendChild(draggedCard);
+  draggedCard = null;
+}
+</script>
+
+</body>
+</html>
