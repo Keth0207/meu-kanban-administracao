@@ -50,8 +50,6 @@ button {
   text-align: center;
 }
 
-.column-title[contenteditable] { outline: none; }
-
 .cards { min-height: 60px; }
 
 .card {
@@ -121,13 +119,12 @@ function addColumn() {
     if (confirm("Excluir coluna?")) column.remove();
   };
 
-  header.appendChild(title);
-  header.appendChild(delCol);
+  header.append(title, delCol);
 
   const cards = document.createElement("div");
   cards.className = "cards";
   cards.ondragover = e => e.preventDefault();
-  cards.ondrop = () => dropCard(cards, title);
+  cards.ondrop = e => dropOnColumn(e, cards);
 
   const btn = document.createElement("button");
   btn.textContent = "+ Tarefa";
@@ -148,6 +145,9 @@ function addCard(container) {
 
   card.ondragstart = () => draggedCard = card;
 
+  card.ondragover = e => e.preventDefault();
+  card.ondrop = e => dropOnCard(e, card);
+
   const del = document.createElement("span");
   del.className = "del";
   del.textContent = "❌";
@@ -159,20 +159,33 @@ function addCard(container) {
   container.appendChild(card);
 }
 
-/* SOLTAR CARTÃO */
-function dropCard(container, title) {
+/* DROP EM CARTÃO */
+function dropOnCard(e, targetCard) {
+  e.stopPropagation();
+  if (!draggedCard || draggedCard === targetCard) return;
+
+  const confirmar = confirm("Essa tarefa é complemento da outra?");
+  if (confirmar) {
+    draggedCard.classList.add("done");
+    targetCard.after(draggedCard);
+  } else {
+    targetCard.parentElement.appendChild(draggedCard);
+  }
+
+  draggedCard = null;
+}
+
+/* DROP NA COLUNA */
+function dropOnColumn(e, container) {
   if (!draggedCard) return;
+
+  const title = container.parentElement.querySelector(".column-title")
+    .textContent.toLowerCase();
 
   draggedCard.classList.remove("done");
 
-  if (title.textContent.toLowerCase().includes("conclu")) {
-    const complemento = confirm("Essa tarefa é complemento de outra?");
-    if (!complemento) {
-      draggedCard.classList.add("done");
-    } else {
-      alert("Complemento cancelado (mantida separada)");
-      draggedCard.classList.add("done");
-    }
+  if (title.includes("conclu")) {
+    draggedCard.classList.add("done");
   }
 
   container.appendChild(draggedCard);
