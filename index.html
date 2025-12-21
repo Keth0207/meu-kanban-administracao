@@ -1,120 +1,50 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta charset="UTF-8">
 <title>Meu Planejador</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
-body{
-  margin:0;
-  font-family:Arial, Helvetica, sans-serif;
-  background:#f4f6f8;
-}
-#board{
-  display:flex;
-  gap:12px;
-  padding:15px;
-  overflow-x:auto;
-}
-.column{
-  background:#e9ecef;
-  min-width:260px;
-  max-width:260px;
-  border-radius:8px;
-  display:flex;
-  flex-direction:column;
-}
-.column-header{
-  padding:10px;
-  font-weight:bold;
-  cursor:grab;
-  background:#dee2e6;
-  border-radius:8px 8px 0 0;
-}
-.column-header input{
-  width:100%;
-  border:none;
-  background:transparent;
-  font-weight:bold;
-}
-.column-header input:focus{outline:none}
-.cards{padding:10px;flex:1}
-.card{
-  background:#fff;
-  border-radius:6px;
-  padding:8px;
-  margin-bottom:8px;
-  cursor:grab;
-  position:relative;
-}
-.card small{
-  font-size:11px;
-  opacity:.7;
-}
-.icons{
-  position:absolute;
-  top:6px;
-  right:6px;
-  display:flex;
-  gap:6px;
-}
-.icon{
-  cursor:pointer;
-  font-size:14px;
-}
-.check-indicator{
-  font-size:12px;
-  margin-top:5px;
-}
+body{margin:0;font-family:Arial;background:#f4f6f8}
+#top{padding:10px;background:#343a40;color:#fff;display:flex;gap:10px}
+select,button,input{padding:6px;border-radius:6px;border:none}
+#board{display:flex;gap:12px;padding:15px;overflow-x:auto}
+.column{background:#e9ecef;min-width:260px;border-radius:8px;display:flex;flex-direction:column}
+.column-header{padding:8px;background:#dee2e6;font-weight:bold;cursor:grab}
+.column-header input{width:100%;border:none;background:transparent;font-weight:bold}
+.cards{padding:8px;flex:1}
+.card{background:#fff;border-radius:6px;padding:8px;margin-bottom:8px;cursor:grab;position:relative}
+.icons{position:absolute;top:5px;right:5px;display:flex;gap:6px}
+.icon{cursor:pointer}
 .green{background:#d4edda!important}
 .yellow{background:#fff3cd!important}
 .blue{background:#0b3c5d!important;color:#fff}
-.blue small{color:#e0e0e0}
-.stripe-green{border-left:6px solid #28a745}
-.stripe-yellow{border-left:6px solid #ffc107}
-
-button{
-  border:none;
-  padding:8px;
-  border-radius:6px;
-  cursor:pointer;
-}
-#addColumn{
-  min-width:200px;
-  height:40px;
-}
-.modal{
-  position:fixed;
-  inset:0;
-  background:rgba(0,0,0,.5);
-  display:none;
-  align-items:center;
-  justify-content:center;
-}
-.modal-content{
-  background:#fff;
-  width:300px;
-  padding:15px;
-  border-radius:8px;
-}
-.modal-content textarea{
-  width:100%;
-  height:80px;
-}
+.stripe-green{border-left:5px solid #28a745}
+.stripe-yellow{border-left:5px solid #ffc107}
+.check-indicator{font-size:12px;margin-top:5px}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center}
+.modal-content{background:#fff;padding:15px;border-radius:8px;width:300px}
 </style>
 </head>
 
 <body>
 
+<div id="top">
+  <select id="boardSelect"></select>
+  <button onclick="newBoard()">+ Quadro</button>
+  <input id="accessCode" placeholder="Código de acesso">
+  <button onclick="enterBoard()">Entrar</button>
+</div>
+
 <div id="board"></div>
-<button id="addColumn">+ Nova coluna</button>
+<button onclick="addColumn()">+ Nova coluna</button>
 
 <div class="modal" id="modal">
   <div class="modal-content">
     <h4>Checklist</h4>
     <div id="checklist"></div>
-    <input id="newCheck" placeholder="Nova tarefa"/>
+    <input id="newCheck" placeholder="Nova tarefa">
     <button onclick="addCheck()">Adicionar</button>
     <br><br>
     <button onclick="closeModal()">Fechar</button>
@@ -122,167 +52,177 @@ button{
 </div>
 
 <script>
-let state = JSON.parse(localStorage.getItem("board")) || {columns:[]};
-let dragged=null, draggedColumn=null, activeCard=null;
+let data = JSON.parse(localStorage.getItem("planner")) || {boards:[]};
+let currentBoard=null, draggedCard=null, draggedColumn=null, activeCard=null;
 
-function save(){
-  localStorage.setItem("board",JSON.stringify(state));
+function save(){localStorage.setItem("planner",JSON.stringify(data));}
+
+function loadBoards(){
+  boardSelect.innerHTML="";
+  data.boards.forEach((b,i)=>{
+    let o=document.createElement("option");
+    o.value=i;o.text=b.name;
+    boardSelect.appendChild(o);
+  });
+}
+
+function newBoard(){
+  let n=prompt("Nome do quadro:");
+  let c=prompt("Código de acesso:");
+  if(!n||!c)return;
+  data.boards.push({name:n,code:c,columns:[]});
+  save();loadBoards();
+}
+
+function enterBoard(){
+  let i=boardSelect.value;
+  if(!data.boards[i])return;
+  if(accessCode.value!==data.boards[i].code){
+    alert("Código incorreto");return;
+  }
+  currentBoard=data.boards[i];
+  render();
+}
+
+function addColumn(){
+  if(!currentBoard)return;
+  if(currentBoard.columns.length>=25)return alert("Máx 25 colunas");
+  currentBoard.columns.push({title:"Nova coluna",cards:[]});
+  save();render();
 }
 
 function render(){
   board.innerHTML="";
-  state.columns.forEach((col,colIdx)=>{
-    const c=document.createElement("div");
+  if(!currentBoard)return;
+  currentBoard.columns.forEach((col,ci)=>{
+    let c=document.createElement("div");
     c.className="column";
 
-    const h=document.createElement("div");
+    let h=document.createElement("div");
     h.className="column-header";
     h.draggable=true;
     h.ondragstart=e=>{
-      draggedColumn=colIdx;
+      draggedColumn=ci;
       e.stopPropagation();
     };
 
-    const input=document.createElement("input");
-    input.value=col.title;
-    input.onchange=e=>{
-      col.title=e.target.value;
+    let inp=document.createElement("input");
+    inp.value=col.title;
+    inp.onchange=e=>{col.title=e.target.value;save();render()};
+    h.appendChild(inp);
+
+    c.ondragover=e=>{if(draggedColumn!==null)e.preventDefault()};
+    c.ondrop=e=>{
+      if(draggedColumn===null)return;
+      let t=currentBoard.columns[draggedColumn];
+      currentBoard.columns.splice(draggedColumn,1);
+      currentBoard.columns.splice(ci,0,t);
+      draggedColumn=null;
       save();render();
     };
-    h.appendChild(input);
 
-    c.ondragover=e=>e.preventDefault();
-    c.ondrop=()=>{
-      if(draggedColumn!==null){
-        const temp=state.columns[draggedColumn];
-        state.columns.splice(draggedColumn,1);
-        state.columns.splice(colIdx,0,temp);
-        draggedColumn=null;
-        save();render();
-      }
+    let cards=document.createElement("div");
+    cards.className="cards";
+    cards.ondragover=e=>e.preventDefault();
+    cards.ondrop=e=>{
+      e.stopPropagation();
+      if(!draggedCard)return;
+      draggedCard.from.cards.splice(draggedCard.idx,1);
+      col.cards.push(draggedCard.card);
+      draggedCard=null;
+      save();render();
     };
 
-    const cards=document.createElement("div");
-    cards.className="cards";
-
     col.cards.forEach((card,idx)=>{
-      const d=document.createElement("div");
+      let d=document.createElement("div");
       d.className="card";
       d.draggable=true;
 
       d.ondragstart=e=>{
-        dragged={card,idx,col};
+        draggedCard={card,idx,from:col};
         e.stopPropagation();
       };
 
-      cards.ondragover=e=>e.preventDefault();
-      cards.ondrop=()=>{
-        if(dragged){
-          dragged.col.cards.splice(dragged.idx,1);
-          col.cards.push(dragged.card);
-          dragged=null;
-          save();render();
-        }
-      };
-
-      let title=document.createElement("div");
-      title.contentEditable=true;
-      title.innerText=card.title;
-      title.onblur=e=>{
-        card.title=e.target.innerText;
-        save();render();
-      };
-      d.appendChild(title);
+      let t=document.createElement("div");
+      t.contentEditable=true;
+      t.innerText=card.title;
+      t.onblur=e=>{card.title=e.target.innerText;save();render()};
+      d.appendChild(t);
 
       if(card.checklist.length){
         let done=card.checklist.filter(c=>c.done).length;
-        let ind=document.createElement("div");
-        ind.className="check-indicator";
-        ind.innerText=`✔ ${done}/${card.checklist.length}`;
-        d.appendChild(ind);
+        let ci=document.createElement("div");
+        ci.className="check-indicator";
+        ci.innerText=`✔ ${done}/${card.checklist.length}`;
+        d.appendChild(ci);
       }
 
-      const icons=document.createElement("div");
+      let icons=document.createElement("div");
       icons.className="icons";
 
       if(card.checklist.length){
-        let ck=document.createElement("span");
-        ck.innerText="☑";
-        ck.className="icon";
-        ck.onclick=()=>openChecklist(card);
-        icons.appendChild(ck);
+        let i=document.createElement("span");
+        i.innerText="☑";i.className="icon";
+        i.onclick=()=>openChecklist(card);
+        icons.appendChild(i);
       }
 
       let del=document.createElement("span");
-      del.innerText="✖";
-      del.className="icon";
-      del.onclick=()=>{
-        col.cards.splice(idx,1);
-        save();render();
-      };
+      del.innerText="✖";del.className="icon";
+      del.onclick=()=>{col.cards.splice(idx,1);save();render()};
       icons.appendChild(del);
 
       d.appendChild(icons);
 
-      const t=col.title.toLowerCase();
-      if(t.includes("concluído")) d.classList.add("green","stripe-green");
-      if(t.includes("andamento")) d.classList.add("yellow","stripe-yellow");
+      let ct=col.title.toLowerCase();
+      if(ct.includes("concluído")) d.classList.add("green","stripe-green");
+      if(ct.includes("andamento")) d.classList.add("yellow","stripe-yellow");
       if(card.title.includes("AdmK")) d.classList.add("blue");
 
       cards.appendChild(d);
     });
 
-    let btn=document.createElement("button");
-    btn.innerText="+ Card";
-    btn.onclick=()=>{
-      col.cards.push({title:"Nova tarefa",checklist:[],created:new Date()});
+    let b=document.createElement("button");
+    b.innerText="+ Card";
+    b.onclick=()=>{
+      col.cards.push({title:"Nova tarefa",checklist:[],history:[{col:col.title,date:new Date()}]});
       save();render();
     };
 
     c.appendChild(h);
     c.appendChild(cards);
-    c.appendChild(btn);
+    c.appendChild(b);
     board.appendChild(c);
   });
 }
-
-addColumn.onclick=()=>{
-  if(state.columns.length>=25)return alert("Máx 25 colunas");
-  state.columns.push({title:"Nova coluna",cards:[]});
-  save();render();
-};
 
 function openChecklist(card){
   activeCard=card;
   checklist.innerHTML="";
   card.checklist.forEach((c,i)=>{
-    let l=document.createElement("div");
+    let d=document.createElement("div");
     let cb=document.createElement("input");
     cb.type="checkbox";
     cb.checked=c.done;
-    cb.onchange=e=>{
-      c.done=e.target.checked;
-      save();render();
-    };
-    l.appendChild(cb);
-    l.appendChild(document.createTextNode(" "+c.text));
-    checklist.appendChild(l);
+    cb.onchange=e=>{c.done=e.target.checked;save();render()};
+    d.appendChild(cb);
+    d.append(" "+c.text);
+    checklist.appendChild(d);
   });
   modal.style.display="flex";
 }
 
 function addCheck(){
-  if(newCheck.value){
-    activeCard.checklist.push({text:newCheck.value,done:false});
-    newCheck.value="";
-    save();render();
-    openChecklist(activeCard);
-  }
+  if(!newCheck.value)return;
+  activeCard.checklist.push({text:newCheck.value,done:false});
+  newCheck.value="";
+  save();render();
+  openChecklist(activeCard);
 }
 
 function closeModal(){modal.style.display="none"}
 
-render();
+loadBoards();
 </script>
 </body>
 </html>
