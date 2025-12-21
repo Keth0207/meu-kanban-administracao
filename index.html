@@ -14,8 +14,6 @@ body {
 
 h1 { text-align: center; padding: 10px; }
 
-.top { text-align: center; margin-bottom: 10px; }
-
 button {
   padding: 6px;
   border: none;
@@ -33,7 +31,7 @@ button {
 
 .column {
   background: #1e293b;
-  min-width: 240px;
+  min-width: 260px;
   border-radius: 10px;
   padding: 10px;
 }
@@ -41,7 +39,6 @@ button {
 .column-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
   cursor: grab;
 }
 
@@ -57,22 +54,35 @@ button {
   padding: 10px;
   margin: 8px 0;
   border-radius: 8px;
-  cursor: grab;
+  cursor: pointer;
   position: relative;
 }
 
 .card.done { background: #16a34a; }
 
-.card .actions {
+.actions {
   position: absolute;
-  right: 6px;
   top: 4px;
+  right: 6px;
   display: flex;
   gap: 6px;
 }
 
-.card .actions span {
-  cursor: pointer;
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.6);
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-content {
+  background: #1e293b;
+  width: 90%;
+  max-width: 400px;
+  padding: 16px;
+  border-radius: 10px;
 }
 </style>
 </head>
@@ -80,126 +90,124 @@ button {
 <body>
 
 <h1>📋 Meu Planejador</h1>
-
-<div class="top">
-  <button onclick="addColumn()">+ Nova coluna</button>
-</div>
+<button onclick="addColumn()">+ Nova coluna</button>
 
 <div class="board" id="board"></div>
 
+<div class="modal" id="modal">
+  <div class="modal-content">
+    <h3 contenteditable id="modalTitle"></h3>
+    <p><strong>Complementos:</strong></p>
+    <ul id="relations"></ul>
+    <button onclick="closeModal()">Fechar</button>
+  </div>
+</div>
+
 <script>
 let draggedCard = null;
-let draggedColumn = null;
-let columnCount = 0;
-const maxColumns = 15;
+let activeCard = null;
 
-/* COLUNA */
 function addColumn() {
-  if (columnCount >= maxColumns) return alert("Máx. 15 colunas");
+  const col = document.createElement("div");
+  col.className = "column";
 
-  const column = document.createElement("div");
-  column.className = "column";
-
-  const header = document.createElement("div");
-  header.className = "column-header";
-  header.draggable = true;
-
-  header.ondragstart = () => draggedColumn = column;
-  header.ondragover = e => e.preventDefault();
-  header.ondrop = () => {
-    if (draggedColumn && draggedColumn !== column) {
-      board.insertBefore(draggedColumn, column);
-      draggedColumn = null;
-    }
-  };
+  const head = document.createElement("div");
+  head.className = "column-header";
+  head.draggable = true;
 
   const title = document.createElement("div");
   title.className = "column-title";
   title.contentEditable = true;
   title.textContent = "Nova coluna";
 
-  const delCol = document.createElement("span");
-  delCol.textContent = "🗑️";
-  delCol.onclick = () => {
-    if (confirm("Excluir coluna?")) column.remove();
-  };
-
-  header.append(title, delCol);
+  head.append(title);
+  col.append(head);
 
   const cards = document.createElement("div");
   cards.className = "cards";
   cards.ondragover = e => e.preventDefault();
   cards.ondrop = () => {
-    if (!draggedCard) return;
-    cards.appendChild(draggedCard);
-    draggedCard = null;
+    if (draggedCard) cards.appendChild(draggedCard);
+    updateDone(cards);
   };
 
   const btn = document.createElement("button");
   btn.textContent = "+ Tarefa";
   btn.onclick = () => addCard(cards);
 
-  column.append(header, cards, btn);
-  board.appendChild(column);
-  columnCount++;
+  col.append(cards, btn);
+  document.getElementById("board").appendChild(col);
 }
 
-/* CARTÃO */
 function addCard(container) {
   const card = document.createElement("div");
   card.className = "card";
-  card.contentEditable = true;
   card.textContent = "Nova tarefa";
   card.draggable = true;
+  card.relations = [];
+
+  card.onclick = e => {
+    if (e.target.tagName === "SPAN") return;
+    openModal(card);
+  };
 
   card.ondragstart = () => draggedCard = card;
 
-  const actions = document.createElement("div");
-  actions.className = "actions";
+  const act = document.createElement("div");
+  act.className = "actions";
 
   const link = document.createElement("span");
   link.textContent = "🔗";
-  link.onclick = () => openRelation(card);
+  link.onclick = () => relate(card);
 
   const del = document.createElement("span");
   del.textContent = "❌";
-  del.onclick = () => {
-    if (confirm("Excluir tarefa?")) card.remove();
-  };
+  del.onclick = () => card.remove();
 
-  actions.append(link, del);
-  card.appendChild(actions);
+  act.append(link, del);
+  card.append(act);
   container.appendChild(card);
+
+  updateDone(container);
 }
 
-/* RELACIONAR */
-function openRelation(card) {
-  const tasks = [...document.querySelectorAll(".card")]
-    .filter(c => 
-      c !== card &&
-      !c.closest(".column")
-       .querySelector(".column-title")
-       .textContent.toLowerCase().includes("conclu")
-    )
-    .map(c => c.textContent.replace("❌","").trim())
-    .sort();
-
-  if (!tasks.length) {
-    alert("Nenhuma tarefa disponível.");
-    return;
-  }
-
-  const choice = prompt(
-    "Escolha a tarefa principal:\n\n" + tasks.join("\n")
+function updateDone(container) {
+  const title = container.parentElement
+    .querySelector(".column-title")
+    .textContent.toLowerCase();
+  [...container.children].forEach(c =>
+    c.classList.toggle("done", title.includes("conclu"))
   );
-
-  if (choice) {
-    alert(`Tarefa relacionada a: ${choice}`);
-  }
 }
 
-/* inicial */
-addColumn();
+function relate(card) {
+  const tasks = [...document.querySelectorAll(".card")]
+    .filter(c => c !== card && !c.classList.contains("done"));
+
+  const names = tasks.map(c => c.firstChild.textContent.trim());
+  const choice = prompt("Digite o nome da tarefa principal:\n\n" + names.join("\n"));
+  const found = tasks.find(c => c.firstChild.textContent.trim() === choice);
+  if (found) card.relations.push(choice);
+}
+
+function openModal(card) {
+  activeCard = card;
+  document.getElementById("modalTitle").innerText = card.firstChild.textContent;
+  const list = document.getElementById("relations");
+  list.innerHTML = "";
+  card.relations.forEach(r => {
+    const li = document.createElement("li");
+    li.textContent = r;
+    list.appendChild(li);
+  });
+  document.getElementById("modal").style.display = "flex";
+}
+
+function closeModal() {
+  activeCard.firstChild.textContent =
+    document.getElementById("modalTitle").innerText;
+  document.getElementById("modal").style.display = "none";
+}
 </script>
 
 </body>
