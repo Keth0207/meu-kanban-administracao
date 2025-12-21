@@ -50,9 +50,7 @@ button {
   text-align: center;
 }
 
-.cards {
-  min-height: 60px;
-}
+.cards { min-height: 60px; }
 
 .card {
   background: #334155;
@@ -63,14 +61,17 @@ button {
   position: relative;
 }
 
-.card.done {
-  background: #16a34a;
-}
+.card.done { background: #16a34a; }
 
-.card .del {
+.card .actions {
   position: absolute;
   right: 6px;
   top: 4px;
+  display: flex;
+  gap: 6px;
+}
+
+.card .actions span {
   cursor: pointer;
 }
 </style>
@@ -128,7 +129,11 @@ function addColumn() {
   const cards = document.createElement("div");
   cards.className = "cards";
   cards.ondragover = e => e.preventDefault();
-  cards.ondrop = e => dropHandler(e, cards);
+  cards.ondrop = () => {
+    if (!draggedCard) return;
+    cards.appendChild(draggedCard);
+    draggedCard = null;
+  };
 
   const btn = document.createElement("button");
   btn.textContent = "+ Tarefa";
@@ -149,44 +154,48 @@ function addCard(container) {
 
   card.ondragstart = () => draggedCard = card;
 
+  const actions = document.createElement("div");
+  actions.className = "actions";
+
+  const link = document.createElement("span");
+  link.textContent = "🔗";
+  link.onclick = () => openRelation(card);
+
   const del = document.createElement("span");
-  del.className = "del";
   del.textContent = "❌";
   del.onclick = () => {
     if (confirm("Excluir tarefa?")) card.remove();
   };
 
-  card.appendChild(del);
+  actions.append(link, del);
+  card.appendChild(actions);
   container.appendChild(card);
 }
 
-/* DROP INTELIGENTE */
-function dropHandler(e, container) {
-  e.preventDefault();
-  if (!draggedCard) return;
+/* RELACIONAR */
+function openRelation(card) {
+  const tasks = [...document.querySelectorAll(".card")]
+    .filter(c => 
+      c !== card &&
+      !c.closest(".column")
+       .querySelector(".column-title")
+       .textContent.toLowerCase().includes("conclu")
+    )
+    .map(c => c.textContent.replace("❌","").trim())
+    .sort();
 
-  const targetCard = e.target.closest(".card");
-
-  if (targetCard && targetCard !== draggedCard) {
-    const confirmar = confirm(
-      "Essa tarefa é complemento da tarefa selecionada?"
-    );
-
-    if (confirmar) {
-      targetCard.after(draggedCard);
-    } else {
-      container.appendChild(draggedCard);
-    }
-  } else {
-    container.appendChild(draggedCard);
+  if (!tasks.length) {
+    alert("Nenhuma tarefa disponível.");
+    return;
   }
 
-  const title = container.parentElement
-    .querySelector(".column-title")
-    .textContent.toLowerCase();
+  const choice = prompt(
+    "Escolha a tarefa principal:\n\n" + tasks.join("\n")
+  );
 
-  draggedCard.classList.toggle("done", title.includes("conclu"));
-  draggedCard = null;
+  if (choice) {
+    alert(`Tarefa relacionada a: ${choice}`);
+  }
 }
 
 /* inicial */
