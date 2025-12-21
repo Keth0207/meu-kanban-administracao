@@ -2,13 +2,11 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<title>Meu Planejador</title>
+<title>Quadro de Tarefas</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
 body{margin:0;font-family:Arial;background:#f4f6f8}
-#top{padding:10px;background:#343a40;color:#fff;display:flex;gap:10px}
-select,button,input{padding:6px;border-radius:6px;border:none}
 #board{display:flex;gap:12px;padding:15px;overflow-x:auto}
 .column{background:#e9ecef;min-width:260px;border-radius:8px;display:flex;flex-direction:column}
 .column-header{padding:8px;background:#dee2e6;font-weight:bold;cursor:grab}
@@ -23,206 +21,162 @@ select,button,input{padding:6px;border-radius:6px;border:none}
 .stripe-green{border-left:5px solid #28a745}
 .stripe-yellow{border-left:5px solid #ffc107}
 .check-indicator{font-size:12px;margin-top:5px}
-.modal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center}
-.modal-content{background:#fff;padding:15px;border-radius:8px;width:300px}
+button{border:none;padding:8px;border-radius:6px;cursor:pointer}
 </style>
 </head>
 
 <body>
 
-<div id="top">
-  <select id="boardSelect"></select>
-  <button onclick="newBoard()">+ Quadro</button>
-  <input id="accessCode" placeholder="Código de acesso">
-  <button onclick="enterBoard()">Entrar</button>
-</div>
-
 <div id="board"></div>
 <button onclick="addColumn()">+ Nova coluna</button>
 
-<div class="modal" id="modal">
-  <div class="modal-content">
-    <h4>Checklist</h4>
-    <div id="checklist"></div>
-    <input id="newCheck" placeholder="Nova tarefa">
-    <button onclick="addCheck()">Adicionar</button>
-    <br><br>
-    <button onclick="closeModal()">Fechar</button>
-  </div>
-</div>
-
 <script>
-let data = JSON.parse(localStorage.getItem("planner")) || {boards:[]};
-let currentBoard=null, draggedCard=null, draggedColumn=null, activeCard=null;
+let state = JSON.parse(localStorage.getItem("board")) || {columns:[]};
 
-function save(){localStorage.setItem("planner",JSON.stringify(data));}
+let draggedCard = null;
+let draggedColumn = null;
 
-function loadBoards(){
-  boardSelect.innerHTML="";
-  data.boards.forEach((b,i)=>{
-    let o=document.createElement("option");
-    o.value=i;o.text=b.name;
-    boardSelect.appendChild(o);
-  });
-}
-
-function newBoard(){
-  let n=prompt("Nome do quadro:");
-  let c=prompt("Código de acesso:");
-  if(!n||!c)return;
-  data.boards.push({name:n,code:c,columns:[]});
-  save();loadBoards();
-}
-
-function enterBoard(){
-  let i=boardSelect.value;
-  if(!data.boards[i])return;
-  if(accessCode.value!==data.boards[i].code){
-    alert("Código incorreto");return;
-  }
-  currentBoard=data.boards[i];
-  render();
+function save(){
+  localStorage.setItem("board", JSON.stringify(state));
 }
 
 function addColumn(){
-  if(!currentBoard)return;
-  if(currentBoard.columns.length>=25)return alert("Máx 25 colunas");
-  currentBoard.columns.push({title:"Nova coluna",cards:[]});
-  save();render();
+  if(state.columns.length >= 25){
+    alert("Máximo de 25 colunas");
+    return;
+  }
+  state.columns.push({title:"Nova coluna", cards:[]});
+  save();
+  render();
 }
 
 function render(){
-  board.innerHTML="";
-  if(!currentBoard)return;
-  currentBoard.columns.forEach((col,ci)=>{
-    let c=document.createElement("div");
-    c.className="column";
+  board.innerHTML = "";
 
-    let h=document.createElement("div");
-    h.className="column-header";
-    h.draggable=true;
-    h.ondragstart=e=>{
-      draggedColumn=ci;
+  state.columns.forEach((col, colIndex) => {
+    const column = document.createElement("div");
+    column.className = "column";
+
+    /* HEADER DA COLUNA (ÚNICO LUGAR QUE MOVE COLUNA) */
+    const header = document.createElement("div");
+    header.className = "column-header";
+    header.draggable = true;
+
+    header.ondragstart = e => {
+      draggedColumn = colIndex;
       e.stopPropagation();
     };
 
-    let inp=document.createElement("input");
-    inp.value=col.title;
-    inp.onchange=e=>{col.title=e.target.value;save();render()};
-    h.appendChild(inp);
+    const titleInput = document.createElement("input");
+    titleInput.value = col.title;
+    titleInput.onchange = e => {
+      col.title = e.target.value;
+      save();
+      render();
+    };
+    header.appendChild(titleInput);
 
-    c.ondragover=e=>{if(draggedColumn!==null)e.preventDefault()};
-    c.ondrop=e=>{
-      if(draggedColumn===null)return;
-      let t=currentBoard.columns[draggedColumn];
-      currentBoard.columns.splice(draggedColumn,1);
-      currentBoard.columns.splice(ci,0,t);
-      draggedColumn=null;
-      save();render();
+    column.ondragover = e => {
+      if(draggedColumn !== null) e.preventDefault();
     };
 
-    let cards=document.createElement("div");
-    cards.className="cards";
-    cards.ondragover=e=>e.preventDefault();
-    cards.ondrop=e=>{
+    column.ondrop = e => {
+      if(draggedColumn === null) return;
+      const temp = state.columns[draggedColumn];
+      state.columns.splice(draggedColumn,1);
+      state.columns.splice(colIndex,0,temp);
+      draggedColumn = null;
+      save();
+      render();
+    };
+
+    /* ÁREA DE CARDS */
+    const cards = document.createElement("div");
+    cards.className = "cards";
+
+    cards.ondragover = e => e.preventDefault();
+    cards.ondrop = e => {
       e.stopPropagation();
-      if(!draggedCard)return;
-      draggedCard.from.cards.splice(draggedCard.idx,1);
+      if(!draggedCard) return;
+      draggedCard.from.cards.splice(draggedCard.index,1);
       col.cards.push(draggedCard.card);
-      draggedCard=null;
-      save();render();
+      draggedCard = null;
+      save();
+      render();
     };
 
-    col.cards.forEach((card,idx)=>{
-      let d=document.createElement("div");
-      d.className="card";
-      d.draggable=true;
+    col.cards.forEach((card, cardIndex) => {
+      const c = document.createElement("div");
+      c.className = "card";
+      c.draggable = true;
 
-      d.ondragstart=e=>{
-        draggedCard={card,idx,from:col};
+      c.ondragstart = e => {
+        draggedCard = {card, index:cardIndex, from:col};
         e.stopPropagation();
       };
 
-      let t=document.createElement("div");
-      t.contentEditable=true;
-      t.innerText=card.title;
-      t.onblur=e=>{card.title=e.target.innerText;save();render()};
-      d.appendChild(t);
+      const title = document.createElement("div");
+      title.contentEditable = true;
+      title.innerText = card.title;
+      title.onblur = e => {
+        card.title = e.target.innerText;
+        save();
+        render();
+      };
+      c.appendChild(title);
 
       if(card.checklist.length){
-        let done=card.checklist.filter(c=>c.done).length;
-        let ci=document.createElement("div");
-        ci.className="check-indicator";
-        ci.innerText=`✔ ${done}/${card.checklist.length}`;
-        d.appendChild(ci);
+        const done = card.checklist.filter(i=>i.done).length;
+        const ind = document.createElement("div");
+        ind.className="check-indicator";
+        ind.innerText = `✔ ${done}/${card.checklist.length}`;
+        c.appendChild(ind);
       }
 
-      let icons=document.createElement("div");
-      icons.className="icons";
+      const icons = document.createElement("div");
+      icons.className = "icons";
 
-      if(card.checklist.length){
-        let i=document.createElement("span");
-        i.innerText="☑";i.className="icon";
-        i.onclick=()=>openChecklist(card);
-        icons.appendChild(i);
-      }
-
-      let del=document.createElement("span");
-      del.innerText="✖";del.className="icon";
-      del.onclick=()=>{col.cards.splice(idx,1);save();render()};
+      const del = document.createElement("span");
+      del.className = "icon";
+      del.innerText = "✖";
+      del.onclick = () => {
+        col.cards.splice(cardIndex,1);
+        save();
+        render();
+      };
       icons.appendChild(del);
+      c.appendChild(icons);
 
-      d.appendChild(icons);
+      const t = col.title.toLowerCase();
+      if(t.includes("concluído")){
+        c.classList.add("green","stripe-green");
+      }
+      if(t.includes("andamento")){
+        c.classList.add("yellow","stripe-yellow");
+      }
+      if(card.title.includes("AdmK")){
+        c.classList.add("blue");
+      }
 
-      let ct=col.title.toLowerCase();
-      if(ct.includes("concluído")) d.classList.add("green","stripe-green");
-      if(ct.includes("andamento")) d.classList.add("yellow","stripe-yellow");
-      if(card.title.includes("AdmK")) d.classList.add("blue");
-
-      cards.appendChild(d);
+      cards.appendChild(c);
     });
 
-    let b=document.createElement("button");
-    b.innerText="+ Card";
-    b.onclick=()=>{
-      col.cards.push({title:"Nova tarefa",checklist:[],history:[{col:col.title,date:new Date()}]});
-      save();render();
+    const addCardBtn = document.createElement("button");
+    addCardBtn.innerText = "+ Card";
+    addCardBtn.onclick = () => {
+      col.cards.push({title:"Nova tarefa", checklist:[]});
+      save();
+      render();
     };
 
-    c.appendChild(h);
-    c.appendChild(cards);
-    c.appendChild(b);
-    board.appendChild(c);
+    column.appendChild(header);
+    column.appendChild(cards);
+    column.appendChild(addCardBtn);
+    board.appendChild(column);
   });
 }
 
-function openChecklist(card){
-  activeCard=card;
-  checklist.innerHTML="";
-  card.checklist.forEach((c,i)=>{
-    let d=document.createElement("div");
-    let cb=document.createElement("input");
-    cb.type="checkbox";
-    cb.checked=c.done;
-    cb.onchange=e=>{c.done=e.target.checked;save();render()};
-    d.appendChild(cb);
-    d.append(" "+c.text);
-    checklist.appendChild(d);
-  });
-  modal.style.display="flex";
-}
-
-function addCheck(){
-  if(!newCheck.value)return;
-  activeCard.checklist.push({text:newCheck.value,done:false});
-  newCheck.value="";
-  save();render();
-  openChecklist(activeCard);
-}
-
-function closeModal(){modal.style.display="none"}
-
-loadBoards();
+render();
 </script>
 </body>
 </html>
