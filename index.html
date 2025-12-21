@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <title>Meu Planejador</title>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
 <style>
 body {
   margin: 0;
@@ -12,13 +14,14 @@ body {
   color: white;
 }
 
-h1 {
-  text-align: center;
+header {
+  display: flex;
+  justify-content: space-between;
   padding: 10px;
 }
 
 button {
-  padding: 6px;
+  padding: 6px 10px;
   border: none;
   border-radius: 6px;
   background: #2563eb;
@@ -40,188 +43,220 @@ button {
   padding: 10px;
 }
 
+.column-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
 .column-title {
-  text-align: center;
   font-weight: bold;
 }
 
 .cards {
-  min-height: 60px;
+  min-height: 50px;
 }
 
 .card {
   background: #334155;
-  padding: 10px;
+  padding: 8px;
   margin: 8px 0;
   border-radius: 8px;
+  cursor: grab;
 }
 
-.card.done {
-  background: #16a34a;
-}
+.card.done { background: #16a34a; }
+.card.progress { background: #eab308; color: black; }
+.card.adm { background: #1e3a8a; }
 
 .modal {
   position: fixed;
   inset: 0;
   background: rgba(0,0,0,.6);
   display: none;
-  align-items: center;
   justify-content: center;
+  align-items: center;
 }
 
 .modal-content {
   background: #1e293b;
   width: 95%;
-  max-width: 480px;
+  max-width: 500px;
   padding: 16px;
   border-radius: 10px;
 }
 
 textarea {
   width: 100%;
-  min-height: 70px;
-  border-radius: 6px;
+  min-height: 60px;
 }
 </style>
 </head>
 
 <body>
 
-<h1>📋 Meu Planejador</h1>
-
-<div style="text-align:center">
-  <button onclick="addColumn()">+ Nova coluna</button>
-</div>
+<header>
+  <h2>📋 Meu Planejador</h2>
+  <button onclick="addColumn()">➕ Nova coluna</button>
+</header>
 
 <div class="board" id="board"></div>
 
-<!-- MODAL -->
 <div class="modal" id="modal">
   <div class="modal-content">
-    <h3 contenteditable id="modalTitle"></h3>
+    <h3 contenteditable id="mTitle"></h3>
 
-    <h4>📝 Descrição / Links</h4>
-    <textarea id="modalDesc" placeholder="Cole aqui links do Google Drive, Docs, etc"></textarea>
+    <h4>Descrição / Links</h4>
+    <textarea id="mDesc"></textarea>
 
-    <h4>☑️ Subtarefas</h4>
-    <div id="subtasks"></div>
-    <button onclick="addSubtask()">+ Subtarefa</button>
+    <h4>Checklist</h4>
+    <div id="mChecklist"></div>
+    <button onclick="addChecklist()">+ Item</button>
 
-    <h4>🔗 Vincular outra tarefa</h4>
-    <button onclick="linkTask()">➕ Vincular</button>
+    <h4>Histórico</h4>
+    <div id="mHistory"></div>
 
-    <br><br>
+    <br>
+    <button onclick="generatePDF()">📄 Gerar PDF</button>
     <button onclick="closeModal()">Fechar</button>
   </div>
 </div>
 
 <script>
-let columnCount = 0;
+let state = JSON.parse(localStorage.getItem("planner")) || { columns: [] };
 let activeCard = null;
 
+function save() {
+  localStorage.setItem("planner", JSON.stringify(state));
+}
+
 function addColumn() {
-  if (columnCount >= 25) {
-    alert("Limite máximo de 25 colunas atingido.");
+  if (state.columns.length >= 25) {
+    alert("Limite de 25 colunas.");
     return;
   }
-
-  columnCount++;
-
-  const col = document.createElement("div");
-  col.className = "column";
-
-  const title = document.createElement("div");
-  title.className = "column-title";
-  title.contentEditable = true;
-  title.textContent = "Nova coluna";
-
-  const cards = document.createElement("div");
-  cards.className = "cards";
-
-  const btn = document.createElement("button");
-  btn.textContent = "+ Tarefa";
-  btn.onclick = () => addCard(cards);
-
-  col.append(title, cards, btn);
-  board.appendChild(col);
+  state.columns.push({ title: "Nova coluna", cards: [] });
+  save(); render();
 }
 
-function addCard(container) {
-  const card = document.createElement("div");
-  card.className = "card";
-
-  card.titleText = "Nova tarefa";
-  card.description = "";
-  card.subtasks = [];
-
-  card.textContent = card.titleText;
-
-  card.onclick = () => openModal(card);
-  container.appendChild(card);
-
-  updateDone(container);
+function addCard(col) {
+  const card = {
+    title: "Nova tarefa",
+    desc: "",
+    checklist: [],
+    history: [{ step: "Criado", date: new Date().toLocaleString() }],
+    created: Date.now()
+  };
+  col.cards.push(card);
+  save(); render();
 }
 
-function updateDone(container) {
-  const colTitle = container.parentElement
-    .querySelector(".column-title").textContent.toLowerCase();
-
-  [...container.children].forEach(card => {
-    card.classList.toggle("done", colTitle.includes("conclu"));
-  });
-}
-
-/* MODAL */
 function openModal(card) {
   activeCard = card;
-  modalTitle.innerText = card.titleText;
-  modalDesc.value = card.description;
-  renderSubtasks();
+  mTitle.innerText = card.title;
+  mDesc.value = card.desc;
+  renderChecklist();
+  renderHistory();
   modal.style.display = "flex";
 }
 
 function closeModal() {
-  activeCard.titleText = modalTitle.innerText;
-  activeCard.description = modalDesc.value;
-  activeCard.textContent = activeCard.titleText;
+  activeCard.title = mTitle.innerText;
+  activeCard.desc = mDesc.value;
+  save(); render();
   modal.style.display = "none";
 }
 
-/* SUBTAREFAS */
-function addSubtask() {
-  const txt = prompt("Nome da subtarefa:");
-  if (!txt) return;
-  activeCard.subtasks.push(txt);
-  renderSubtasks();
+function addChecklist() {
+  const txt = prompt("Item:");
+  if (txt) activeCard.checklist.push({ txt, done:false });
+  save(); renderChecklist();
 }
 
-function renderSubtasks() {
-  subtasks.innerHTML = "";
-  activeCard.subtasks.forEach(s => {
-    const div = document.createElement("div");
-    div.textContent = "☑️ " + s;
-    subtasks.appendChild(div);
+function renderChecklist() {
+  mChecklist.innerHTML = "";
+  activeCard.checklist.forEach(i => {
+    const d = document.createElement("div");
+    d.innerText = "☑ " + i.txt;
+    mChecklist.appendChild(d);
   });
 }
 
-/* VINCULAR */
-function linkTask() {
-  const tasks = [];
-  document.querySelectorAll(".card").forEach(c => {
-    if (c !== activeCard && !c.parentElement.parentElement
-      .querySelector(".column-title").textContent.toLowerCase().includes("conclu")) {
-      tasks.push(c);
-    }
+function renderHistory() {
+  mHistory.innerHTML = "";
+  activeCard.history.forEach(h => {
+    const d = document.createElement("div");
+    d.innerText = `${h.step} - ${h.date}`;
+    mHistory.appendChild(d);
+  });
+}
+
+function generatePDF() {
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF();
+  let y = 10;
+
+  pdf.text(`Tarefa: ${activeCard.title}`, 10, y); y+=8;
+  pdf.text(`Descrição: ${activeCard.desc}`, 10, y); y+=8;
+  pdf.text("Histórico:", 10, y); y+=6;
+
+  activeCard.history.forEach(h=>{
+    pdf.text(`- ${h.step} (${h.date})`,10,y);
+    y+=6;
   });
 
-  const names = tasks.map((t,i) => `${i+1} - ${t.titleText}`).join("\n");
-  const pick = prompt("Escolha a tarefa para vincular:\n" + names);
-  const chosen = tasks[pick-1];
-  if (chosen) {
-    activeCard.subtasks.push("↳ " + chosen.titleText);
-    renderSubtasks();
-  }
+  pdf.save(activeCard.title + ".pdf");
 }
+
+function render() {
+  board.innerHTML = "";
+  state.columns.forEach(col => {
+    const c = document.createElement("div");
+    c.className = "column";
+
+    const h = document.createElement("div");
+    h.className = "column-header";
+
+    const t = document.createElement("div");
+    t.className = "column-title";
+    t.contentEditable = true;
+    t.innerText = col.title;
+    t.onblur = ()=>{ col.title=t.innerText; save(); };
+
+    const del = document.createElement("button");
+    del.textContent="🗑";
+    del.onclick=()=>{ state.columns=state.columns.filter(x=>x!==col); save(); render(); };
+
+    h.append(t,del);
+    c.appendChild(h);
+
+    const cards = document.createElement("div");
+    cards.className="cards";
+
+    col.cards.forEach(card=>{
+      const d=document.createElement("div");
+      d.className="card";
+      d.innerText=card.title;
+      d.onclick=()=>openModal(card);
+
+      const name = col.title.toLowerCase();
+      if(name.includes("conclu")) d.classList.add("done");
+      if(name.includes("andamento")) d.classList.add("progress");
+      if(card.title.includes("AdmK")) d.classList.add("adm");
+
+      cards.appendChild(d);
+    });
+
+    const btn=document.createElement("button");
+    btn.textContent="+ Tarefa";
+    btn.onclick=()=>addCard(col);
+
+    c.append(cards,btn);
+    board.appendChild(c);
+  });
+}
+
+render();
 </script>
 
 </body>
