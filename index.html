@@ -12,7 +12,10 @@ body {
   color: white;
 }
 
-h1 { text-align: center; padding: 10px; }
+h1 {
+  text-align: center;
+  padding: 10px;
+}
 
 button {
   padding: 6px;
@@ -20,6 +23,7 @@ button {
   border-radius: 6px;
   background: #2563eb;
   color: white;
+  cursor: pointer;
 }
 
 .board {
@@ -38,7 +42,7 @@ button {
 
 .column-header {
   display: flex;
-  justify-content: space-between;
+  align-items: center;
   cursor: grab;
 }
 
@@ -47,25 +51,30 @@ button {
   text-align: center;
 }
 
-.cards { min-height: 60px; }
+.cards {
+  min-height: 60px;
+}
 
 .card {
   background: #334155;
   padding: 10px;
   margin: 8px 0;
   border-radius: 8px;
-  cursor: pointer;
   position: relative;
 }
 
-.card.done { background: #16a34a; }
+.card.done {
+  background: #16a34a;
+}
 
-.actions {
+.card-title {
+  font-weight: bold;
+}
+
+.card-actions {
   position: absolute;
   top: 4px;
   right: 6px;
-  display: flex;
-  gap: 6px;
 }
 
 .modal {
@@ -79,10 +88,21 @@ button {
 
 .modal-content {
   background: #1e293b;
-  width: 90%;
-  max-width: 400px;
+  width: 95%;
+  max-width: 450px;
   padding: 16px;
   border-radius: 10px;
+}
+
+.subtask {
+  display: flex;
+  gap: 6px;
+  margin: 4px 0;
+}
+
+.attachment {
+  font-size: 13px;
+  margin: 4px 0;
 }
 </style>
 </head>
@@ -90,15 +110,26 @@ button {
 <body>
 
 <h1>📋 Meu Planejador</h1>
-<button onclick="addColumn()">+ Nova coluna</button>
+<div style="text-align:center">
+  <button onclick="addColumn()">+ Nova coluna</button>
+</div>
 
 <div class="board" id="board"></div>
 
+<!-- MODAL -->
 <div class="modal" id="modal">
   <div class="modal-content">
     <h3 contenteditable id="modalTitle"></h3>
-    <p><strong>Complementos:</strong></p>
-    <ul id="relations"></ul>
+
+    <h4>☑️ Subtarefas</h4>
+    <div id="subtasks"></div>
+    <button onclick="addSubtask()">+ Subtarefa</button>
+
+    <h4>📎 Anexos</h4>
+    <input type="file" id="fileInput">
+    <div id="attachments"></div>
+
+    <br>
     <button onclick="closeModal()">Fechar</button>
   </div>
 </div>
@@ -107,6 +138,7 @@ button {
 let draggedCard = null;
 let activeCard = null;
 
+/* COLUNA */
 function addColumn() {
   const col = document.createElement("div");
   col.className = "column";
@@ -136,77 +168,101 @@ function addColumn() {
   btn.onclick = () => addCard(cards);
 
   col.append(cards, btn);
-  document.getElementById("board").appendChild(col);
+  board.appendChild(col);
 }
 
+/* CARTÃO */
 function addCard(container) {
   const card = document.createElement("div");
   card.className = "card";
-  card.textContent = "Nova tarefa";
   card.draggable = true;
-  card.relations = [];
+  card.subtasks = [];
+  card.attachments = [];
 
-  card.onclick = e => {
-    if (e.target.tagName === "SPAN") return;
-    openModal(card);
-  };
+  const title = document.createElement("div");
+  title.className = "card-title";
+  title.contentEditable = true;
+  title.textContent = "Nova tarefa";
 
+  card.onclick = () => openModal(card);
   card.ondragstart = () => draggedCard = card;
 
-  const act = document.createElement("div");
-  act.className = "actions";
-
-  const link = document.createElement("span");
-  link.textContent = "🔗";
-  link.onclick = () => relate(card);
-
-  const del = document.createElement("span");
-  del.textContent = "❌";
-  del.onclick = () => card.remove();
-
-  act.append(link, del);
-  card.append(act);
+  card.append(title);
   container.appendChild(card);
 
   updateDone(container);
 }
 
+/* CONCLUÍDO */
 function updateDone(container) {
-  const title = container.parentElement
+  const colTitle = container.parentElement
     .querySelector(".column-title")
     .textContent.toLowerCase();
-  [...container.children].forEach(c =>
-    c.classList.toggle("done", title.includes("conclu"))
-  );
+
+  [...container.children].forEach(card => {
+    card.classList.toggle("done", colTitle.includes("conclu"));
+  });
 }
 
-function relate(card) {
-  const tasks = [...document.querySelectorAll(".card")]
-    .filter(c => c !== card && !c.classList.contains("done"));
-
-  const names = tasks.map(c => c.firstChild.textContent.trim());
-  const choice = prompt("Digite o nome da tarefa principal:\n\n" + names.join("\n"));
-  const found = tasks.find(c => c.firstChild.textContent.trim() === choice);
-  if (found) card.relations.push(choice);
-}
-
+/* MODAL */
 function openModal(card) {
   activeCard = card;
-  document.getElementById("modalTitle").innerText = card.firstChild.textContent;
-  const list = document.getElementById("relations");
-  list.innerHTML = "";
-  card.relations.forEach(r => {
-    const li = document.createElement("li");
-    li.textContent = r;
-    list.appendChild(li);
-  });
-  document.getElementById("modal").style.display = "flex";
+  modalTitle.innerText = card.querySelector(".card-title").innerText;
+  renderSubtasks();
+  renderAttachments();
+  modal.style.display = "flex";
 }
 
 function closeModal() {
-  activeCard.firstChild.textContent =
-    document.getElementById("modalTitle").innerText;
-  document.getElementById("modal").style.display = "none";
+  activeCard.querySelector(".card-title").innerText = modalTitle.innerText;
+  modal.style.display = "none";
+}
+
+/* SUBTAREFAS */
+function addSubtask() {
+  const text = prompt("Nome da subtarefa:");
+  if (!text) return;
+  activeCard.subtasks.push({ text, done:false });
+  renderSubtasks();
+}
+
+function renderSubtasks() {
+  subtasks.innerHTML = "";
+  activeCard.subtasks.forEach((s,i) => {
+    const div = document.createElement("div");
+    div.className = "subtask";
+
+    const chk = document.createElement("input");
+    chk.type = "checkbox";
+    chk.checked = s.done;
+    chk.onchange = () => s.done = chk.checked;
+
+    const span = document.createElement("span");
+    span.textContent = s.text;
+
+    div.append(chk, span);
+    subtasks.appendChild(div);
+  });
+}
+
+/* ANEXOS */
+fileInput.onchange = () => {
+  const file = fileInput.files[0];
+  if (!file) return;
+
+  activeCard.attachments.push(file.name);
+  fileInput.value = "";
+  renderAttachments();
+};
+
+function renderAttachments() {
+  attachments.innerHTML = "";
+  activeCard.attachments.forEach(a => {
+    const div = document.createElement("div");
+    div.className = "attachment";
+    div.textContent = "📎 " + a;
+    attachments.appendChild(div);
+  });
 }
 </script>
 
