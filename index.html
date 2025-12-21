@@ -47,6 +47,7 @@ button {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  cursor: grab;
 }
 
 .column-title {
@@ -70,6 +71,9 @@ button {
 .card.progress { background: #eab308; color: black; }
 .card.adm { background: #1e3a8a; }
 
+.card.adm.strip-progress { border-left: 6px solid #eab308; }
+.card.adm.strip-done { border-left: 6px solid #16a34a; }
+
 .card-title {
   font-weight: bold;
 }
@@ -79,6 +83,11 @@ button {
   top: 4px;
   right: 6px;
   cursor: pointer;
+}
+
+.card-icons {
+  font-size: 13px;
+  margin-top: 4px;
 }
 
 .modal {
@@ -138,6 +147,7 @@ textarea {
 let state = JSON.parse(localStorage.getItem("planner")) || { columns: [] };
 let activeCard = null;
 let dragged = null;
+let draggedColumn = null;
 
 function save(){ localStorage.setItem("planner", JSON.stringify(state)); }
 
@@ -219,9 +229,19 @@ function generatePDF(){
 
 function render(){
   board.innerHTML="";
-  state.columns.forEach(col=>{
+  state.columns.forEach((col,colIdx)=>{
     const c=document.createElement("div");
     c.className="column";
+    c.draggable=true;
+
+    c.ondragstart=()=>draggedColumn=colIdx;
+    c.ondragover=e=>e.preventDefault();
+    c.ondrop=()=>{
+      const temp=state.columns[draggedColumn];
+      state.columns.splice(draggedColumn,1);
+      state.columns.splice(colIdx,0,temp);
+      save(); render();
+    };
 
     const h=document.createElement("div");
     h.className="column-header";
@@ -268,14 +288,22 @@ function render(){
       x.textContent="🗑";
       x.onclick=()=>{col.cards.splice(idx,1); save(); render();};
 
-      d.onclick=e=>{ if(e.target!==x) openModal(card); };
+      const icons=document.createElement("div");
+      icons.className="card-icons";
+      if(card.checklist.length>0) icons.innerText="☑️";
+
+      d.onclick=e=>{ if(e.target!==x && e.target!==title) openModal(card); };
 
       const name=col.title.toLowerCase();
       if(name.includes("conclu")) d.classList.add("done");
       if(name.includes("andamento")) d.classList.add("progress");
-      if(card.title.includes("AdmK")) d.classList.add("adm");
+      if(card.title.includes("AdmK")) {
+        d.classList.add("adm");
+        if(name.includes("conclu")) d.classList.add("strip-done");
+        if(name.includes("andamento")) d.classList.add("strip-progress");
+      }
 
-      d.append(title,x);
+      d.append(title,x,icons);
       cards.appendChild(d);
     });
 
