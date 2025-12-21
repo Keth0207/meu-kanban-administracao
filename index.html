@@ -63,11 +63,23 @@ button {
   margin: 8px 0;
   border-radius: 8px;
   cursor: grab;
+  position: relative;
 }
 
 .card.done { background: #16a34a; }
 .card.progress { background: #eab308; color: black; }
 .card.adm { background: #1e3a8a; }
+
+.card-title {
+  font-weight: bold;
+}
+
+.card-del {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  cursor: pointer;
+}
 
 .modal {
   position: fixed;
@@ -109,7 +121,7 @@ textarea {
     <h4>Descrição / Links</h4>
     <textarea id="mDesc"></textarea>
 
-    <h4>Checklist</h4>
+    <h4>Checklist <span id="chkCount"></span></h4>
     <div id="mChecklist"></div>
     <button onclick="addChecklist()">+ Item</button>
 
@@ -125,125 +137,145 @@ textarea {
 <script>
 let state = JSON.parse(localStorage.getItem("planner")) || { columns: [] };
 let activeCard = null;
+let dragged = null;
 
-function save() {
-  localStorage.setItem("planner", JSON.stringify(state));
-}
+function save(){ localStorage.setItem("planner", JSON.stringify(state)); }
 
-function addColumn() {
-  if (state.columns.length >= 25) {
-    alert("Limite de 25 colunas.");
-    return;
-  }
-  state.columns.push({ title: "Nova coluna", cards: [] });
+function addColumn(){
+  if(state.columns.length>=25){ alert("Limite de 25 colunas"); return; }
+  state.columns.push({ title:"Nova coluna", cards:[] });
   save(); render();
 }
 
-function addCard(col) {
-  const card = {
-    title: "Nova tarefa",
-    desc: "",
-    checklist: [],
-    history: [{ step: "Criado", date: new Date().toLocaleString() }],
-    created: Date.now()
+function addCard(col){
+  const card={
+    title:"Nova tarefa",
+    desc:"",
+    checklist:[],
+    history:[{step:"Criado",date:new Date().toLocaleString()}]
   };
   col.cards.push(card);
   save(); render();
 }
 
-function openModal(card) {
-  activeCard = card;
-  mTitle.innerText = card.title;
-  mDesc.value = card.desc;
+function openModal(card){
+  activeCard=card;
+  mTitle.innerText=card.title;
+  mDesc.value=card.desc;
   renderChecklist();
   renderHistory();
-  modal.style.display = "flex";
+  modal.style.display="flex";
 }
 
-function closeModal() {
-  activeCard.title = mTitle.innerText;
-  activeCard.desc = mDesc.value;
+function closeModal(){
+  activeCard.title=mTitle.innerText;
+  activeCard.desc=mDesc.value;
   save(); render();
-  modal.style.display = "none";
+  modal.style.display="none";
 }
 
-function addChecklist() {
-  const txt = prompt("Item:");
-  if (txt) activeCard.checklist.push({ txt, done:false });
+function addChecklist(){
+  const t=prompt("Item:");
+  if(!t)return;
+  activeCard.checklist.push({txt:t,done:false});
   save(); renderChecklist();
 }
 
-function renderChecklist() {
-  mChecklist.innerHTML = "";
-  activeCard.checklist.forEach(i => {
-    const d = document.createElement("div");
-    d.innerText = "☑ " + i.txt;
+function renderChecklist(){
+  mChecklist.innerHTML="";
+  let done=0;
+  activeCard.checklist.forEach(i=>{
+    const d=document.createElement("div");
+    const c=document.createElement("input");
+    c.type="checkbox";
+    c.checked=i.done;
+    c.onchange=()=>{i.done=c.checked; save(); renderChecklist();}
+    if(i.done) done++;
+    d.append(c,document.createTextNode(" "+i.txt));
     mChecklist.appendChild(d);
   });
+  chkCount.innerText=`(${done}/${activeCard.checklist.length})`;
 }
 
-function renderHistory() {
-  mHistory.innerHTML = "";
-  activeCard.history.forEach(h => {
-    const d = document.createElement("div");
-    d.innerText = `${h.step} - ${h.date}`;
+function renderHistory(){
+  mHistory.innerHTML="";
+  activeCard.history.forEach(h=>{
+    const d=document.createElement("div");
+    d.innerText=`${h.step} - ${h.date}`;
     mHistory.appendChild(d);
   });
 }
 
-function generatePDF() {
-  const { jsPDF } = window.jspdf;
-  const pdf = new jsPDF();
-  let y = 10;
-
-  pdf.text(`Tarefa: ${activeCard.title}`, 10, y); y+=8;
-  pdf.text(`Descrição: ${activeCard.desc}`, 10, y); y+=8;
-  pdf.text("Histórico:", 10, y); y+=6;
-
+function generatePDF(){
+  const {jsPDF}=window.jspdf;
+  const pdf=new jsPDF();
+  let y=10;
+  pdf.text(`Tarefa: ${activeCard.title}`,10,y); y+=8;
   activeCard.history.forEach(h=>{
-    pdf.text(`- ${h.step} (${h.date})`,10,y);
-    y+=6;
+    pdf.text(`- ${h.step} (${h.date})`,10,y); y+=6;
   });
-
-  pdf.save(activeCard.title + ".pdf");
+  pdf.save(activeCard.title+".pdf");
 }
 
-function render() {
-  board.innerHTML = "";
-  state.columns.forEach(col => {
-    const c = document.createElement("div");
-    c.className = "column";
+function render(){
+  board.innerHTML="";
+  state.columns.forEach(col=>{
+    const c=document.createElement("div");
+    c.className="column";
 
-    const h = document.createElement("div");
-    h.className = "column-header";
+    const h=document.createElement("div");
+    h.className="column-header";
 
-    const t = document.createElement("div");
-    t.className = "column-title";
-    t.contentEditable = true;
-    t.innerText = col.title;
-    t.onblur = ()=>{ col.title=t.innerText; save(); };
+    const t=document.createElement("div");
+    t.className="column-title";
+    t.contentEditable=true;
+    t.innerText=col.title;
+    t.onblur=()=>{col.title=t.innerText; save();};
 
-    const del = document.createElement("button");
+    const del=document.createElement("button");
     del.textContent="🗑";
-    del.onclick=()=>{ state.columns=state.columns.filter(x=>x!==col); save(); render(); };
+    del.onclick=()=>{state.columns=state.columns.filter(x=>x!==col); save(); render();};
 
     h.append(t,del);
     c.appendChild(h);
 
-    const cards = document.createElement("div");
+    const cards=document.createElement("div");
     cards.className="cards";
+    cards.ondragover=e=>e.preventDefault();
+    cards.ondrop=()=>{
+      if(dragged){
+        dragged.col.cards.splice(dragged.idx,1);
+        col.cards.push(dragged.card);
+        dragged.card.history.push({step:`Movido para ${col.title}`,date:new Date().toLocaleString()});
+        save(); render();
+      }
+    };
 
-    col.cards.forEach(card=>{
+    col.cards.forEach((card,idx)=>{
       const d=document.createElement("div");
       d.className="card";
-      d.innerText=card.title;
-      d.onclick=()=>openModal(card);
+      d.draggable=true;
+      d.ondragstart=()=>dragged={card,idx,col};
 
-      const name = col.title.toLowerCase();
+      const title=document.createElement("div");
+      title.className="card-title";
+      title.contentEditable=true;
+      title.innerText=card.title;
+      title.onblur=()=>{card.title=title.innerText; save();};
+
+      const x=document.createElement("span");
+      x.className="card-del";
+      x.textContent="🗑";
+      x.onclick=()=>{col.cards.splice(idx,1); save(); render();};
+
+      d.onclick=e=>{ if(e.target!==x) openModal(card); };
+
+      const name=col.title.toLowerCase();
       if(name.includes("conclu")) d.classList.add("done");
       if(name.includes("andamento")) d.classList.add("progress");
       if(card.title.includes("AdmK")) d.classList.add("adm");
 
+      d.append(title,x);
       cards.appendChild(d);
     });
 
