@@ -1,230 +1,132 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Meu Planejador</title>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-
 <style>
-body {
-  margin: 0;
-  font-family: Arial, sans-serif;
-  background: #0f172a;
-  color: white;
+body{
+  margin:0;
+  font-family:Arial, Helvetica, sans-serif;
+  background:#f4f6f8;
 }
-
-header {
-  display: flex;
-  justify-content: space-between;
-  padding: 10px;
+#board{
+  display:flex;
+  gap:12px;
+  padding:15px;
+  overflow-x:auto;
 }
-
-button {
-  padding: 6px 10px;
-  border: none;
-  border-radius: 6px;
-  background: #2563eb;
-  color: white;
-  cursor: pointer;
+.column{
+  background:#e9ecef;
+  min-width:260px;
+  max-width:260px;
+  border-radius:8px;
+  display:flex;
+  flex-direction:column;
 }
-
-.board {
-  display: flex;
-  gap: 12px;
-  padding: 12px;
-  overflow-x: auto;
+.column-header{
+  padding:10px;
+  font-weight:bold;
+  cursor:grab;
+  background:#dee2e6;
+  border-radius:8px 8px 0 0;
 }
-
-.column {
-  background: #1e293b;
-  min-width: 260px;
-  border-radius: 10px;
-  padding: 10px;
+.column-header input{
+  width:100%;
+  border:none;
+  background:transparent;
+  font-weight:bold;
 }
-
-.column-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  cursor: grab;
+.column-header input:focus{outline:none}
+.cards{padding:10px;flex:1}
+.card{
+  background:#fff;
+  border-radius:6px;
+  padding:8px;
+  margin-bottom:8px;
+  cursor:grab;
+  position:relative;
 }
-
-.column-title {
-  font-weight: bold;
+.card small{
+  font-size:11px;
+  opacity:.7;
 }
-
-.cards {
-  min-height: 50px;
+.icons{
+  position:absolute;
+  top:6px;
+  right:6px;
+  display:flex;
+  gap:6px;
 }
-
-.card {
-  background: #334155;
-  padding: 8px;
-  margin: 8px 0;
-  border-radius: 8px;
-  cursor: grab;
-  position: relative;
+.icon{
+  cursor:pointer;
+  font-size:14px;
 }
-
-.card.done { background: #16a34a; }
-.card.progress { background: #eab308; color: black; }
-.card.adm { background: #1e3a8a; }
-
-.card.adm.strip-progress { border-left: 6px solid #eab308; }
-.card.adm.strip-done { border-left: 6px solid #16a34a; }
-
-.card-title {
-  font-weight: bold;
+.check-indicator{
+  font-size:12px;
+  margin-top:5px;
 }
+.green{background:#d4edda!important}
+.yellow{background:#fff3cd!important}
+.blue{background:#0b3c5d!important;color:#fff}
+.blue small{color:#e0e0e0}
+.stripe-green{border-left:6px solid #28a745}
+.stripe-yellow{border-left:6px solid #ffc107}
 
-.card-del {
-  position: absolute;
-  top: 4px;
-  right: 6px;
-  cursor: pointer;
+button{
+  border:none;
+  padding:8px;
+  border-radius:6px;
+  cursor:pointer;
 }
-
-.card-icons {
-  font-size: 13px;
-  margin-top: 4px;
+#addColumn{
+  min-width:200px;
+  height:40px;
 }
-
-.modal {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,.6);
-  display: none;
-  justify-content: center;
-  align-items: center;
+.modal{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,.5);
+  display:none;
+  align-items:center;
+  justify-content:center;
 }
-
-.modal-content {
-  background: #1e293b;
-  width: 95%;
-  max-width: 500px;
-  padding: 16px;
-  border-radius: 10px;
+.modal-content{
+  background:#fff;
+  width:300px;
+  padding:15px;
+  border-radius:8px;
 }
-
-textarea {
-  width: 100%;
-  min-height: 60px;
+.modal-content textarea{
+  width:100%;
+  height:80px;
 }
 </style>
 </head>
 
 <body>
 
-<header>
-  <h2>📋 Meu Planejador</h2>
-  <button onclick="addColumn()">➕ Nova coluna</button>
-</header>
-
-<div class="board" id="board"></div>
+<div id="board"></div>
+<button id="addColumn">+ Nova coluna</button>
 
 <div class="modal" id="modal">
   <div class="modal-content">
-    <h3 contenteditable id="mTitle"></h3>
-
-    <h4>Descrição / Links</h4>
-    <textarea id="mDesc"></textarea>
-
-    <h4>Checklist <span id="chkCount"></span></h4>
-    <div id="mChecklist"></div>
-    <button onclick="addChecklist()">+ Item</button>
-
-    <h4>Histórico</h4>
-    <div id="mHistory"></div>
-
-    <br>
-    <button onclick="generatePDF()">📄 Gerar PDF</button>
+    <h4>Checklist</h4>
+    <div id="checklist"></div>
+    <input id="newCheck" placeholder="Nova tarefa"/>
+    <button onclick="addCheck()">Adicionar</button>
+    <br><br>
     <button onclick="closeModal()">Fechar</button>
   </div>
 </div>
 
 <script>
-let state = JSON.parse(localStorage.getItem("planner")) || { columns: [] };
-let activeCard = null;
-let dragged = null;
-let draggedColumn = null;
+let state = JSON.parse(localStorage.getItem("board")) || {columns:[]};
+let dragged=null, draggedColumn=null, activeCard=null;
 
-function save(){ localStorage.setItem("planner", JSON.stringify(state)); }
-
-function addColumn(){
-  if(state.columns.length>=25){ alert("Limite de 25 colunas"); return; }
-  state.columns.push({ title:"Nova coluna", cards:[] });
-  save(); render();
-}
-
-function addCard(col){
-  const card={
-    title:"Nova tarefa",
-    desc:"",
-    checklist:[],
-    history:[{step:"Criado",date:new Date().toLocaleString()}]
-  };
-  col.cards.push(card);
-  save(); render();
-}
-
-function openModal(card){
-  activeCard=card;
-  mTitle.innerText=card.title;
-  mDesc.value=card.desc;
-  renderChecklist();
-  renderHistory();
-  modal.style.display="flex";
-}
-
-function closeModal(){
-  activeCard.title=mTitle.innerText;
-  activeCard.desc=mDesc.value;
-  save(); render();
-  modal.style.display="none";
-}
-
-function addChecklist(){
-  const t=prompt("Item:");
-  if(!t)return;
-  activeCard.checklist.push({txt:t,done:false});
-  save(); renderChecklist();
-}
-
-function renderChecklist(){
-  mChecklist.innerHTML="";
-  let done=0;
-  activeCard.checklist.forEach(i=>{
-    const d=document.createElement("div");
-    const c=document.createElement("input");
-    c.type="checkbox";
-    c.checked=i.done;
-    c.onchange=()=>{i.done=c.checked; save(); renderChecklist();}
-    if(i.done) done++;
-    d.append(c,document.createTextNode(" "+i.txt));
-    mChecklist.appendChild(d);
-  });
-  chkCount.innerText=`(${done}/${activeCard.checklist.length})`;
-}
-
-function renderHistory(){
-  mHistory.innerHTML="";
-  activeCard.history.forEach(h=>{
-    const d=document.createElement("div");
-    d.innerText=`${h.step} - ${h.date}`;
-    mHistory.appendChild(d);
-  });
-}
-
-function generatePDF(){
-  const {jsPDF}=window.jspdf;
-  const pdf=new jsPDF();
-  let y=10;
-  pdf.text(`Tarefa: ${activeCard.title}`,10,y); y+=8;
-  activeCard.history.forEach(h=>{
-    pdf.text(`- ${h.step} (${h.date})`,10,y); y+=6;
-  });
-  pdf.save(activeCard.title+".pdf");
+function save(){
+  localStorage.setItem("board",JSON.stringify(state));
 }
 
 function render(){
@@ -232,92 +134,155 @@ function render(){
   state.columns.forEach((col,colIdx)=>{
     const c=document.createElement("div");
     c.className="column";
-    c.draggable=true;
-
-    c.ondragstart=()=>draggedColumn=colIdx;
-    c.ondragover=e=>e.preventDefault();
-    c.ondrop=()=>{
-      const temp=state.columns[draggedColumn];
-      state.columns.splice(draggedColumn,1);
-      state.columns.splice(colIdx,0,temp);
-      save(); render();
-    };
 
     const h=document.createElement("div");
     h.className="column-header";
+    h.draggable=true;
+    h.ondragstart=e=>{
+      draggedColumn=colIdx;
+      e.stopPropagation();
+    };
 
-    const t=document.createElement("div");
-    t.className="column-title";
-    t.contentEditable=true;
-    t.innerText=col.title;
-    t.onblur=()=>{col.title=t.innerText; save();};
+    const input=document.createElement("input");
+    input.value=col.title;
+    input.onchange=e=>{
+      col.title=e.target.value;
+      save();render();
+    };
+    h.appendChild(input);
 
-    const del=document.createElement("button");
-    del.textContent="🗑";
-    del.onclick=()=>{state.columns=state.columns.filter(x=>x!==col); save(); render();};
-
-    h.append(t,del);
-    c.appendChild(h);
+    c.ondragover=e=>e.preventDefault();
+    c.ondrop=()=>{
+      if(draggedColumn!==null){
+        const temp=state.columns[draggedColumn];
+        state.columns.splice(draggedColumn,1);
+        state.columns.splice(colIdx,0,temp);
+        draggedColumn=null;
+        save();render();
+      }
+    };
 
     const cards=document.createElement("div");
     cards.className="cards";
-    cards.ondragover=e=>e.preventDefault();
-    cards.ondrop=()=>{
-      if(dragged){
-        dragged.col.cards.splice(dragged.idx,1);
-        col.cards.push(dragged.card);
-        dragged.card.history.push({step:`Movido para ${col.title}`,date:new Date().toLocaleString()});
-        save(); render();
-      }
-    };
 
     col.cards.forEach((card,idx)=>{
       const d=document.createElement("div");
       d.className="card";
       d.draggable=true;
-      d.ondragstart=()=>dragged={card,idx,col};
 
-      const title=document.createElement("div");
-      title.className="card-title";
+      d.ondragstart=e=>{
+        dragged={card,idx,col};
+        e.stopPropagation();
+      };
+
+      cards.ondragover=e=>e.preventDefault();
+      cards.ondrop=()=>{
+        if(dragged){
+          dragged.col.cards.splice(dragged.idx,1);
+          col.cards.push(dragged.card);
+          dragged=null;
+          save();render();
+        }
+      };
+
+      let title=document.createElement("div");
       title.contentEditable=true;
       title.innerText=card.title;
-      title.onblur=()=>{card.title=title.innerText; save();};
+      title.onblur=e=>{
+        card.title=e.target.innerText;
+        save();render();
+      };
+      d.appendChild(title);
 
-      const x=document.createElement("span");
-      x.className="card-del";
-      x.textContent="🗑";
-      x.onclick=()=>{col.cards.splice(idx,1); save(); render();};
-
-      const icons=document.createElement("div");
-      icons.className="card-icons";
-      if(card.checklist.length>0) icons.innerText="☑️";
-
-      d.onclick=e=>{ if(e.target!==x && e.target!==title) openModal(card); };
-
-      const name=col.title.toLowerCase();
-      if(name.includes("conclu")) d.classList.add("done");
-      if(name.includes("andamento")) d.classList.add("progress");
-      if(card.title.includes("AdmK")) {
-        d.classList.add("adm");
-        if(name.includes("conclu")) d.classList.add("strip-done");
-        if(name.includes("andamento")) d.classList.add("strip-progress");
+      if(card.checklist.length){
+        let done=card.checklist.filter(c=>c.done).length;
+        let ind=document.createElement("div");
+        ind.className="check-indicator";
+        ind.innerText=`✔ ${done}/${card.checklist.length}`;
+        d.appendChild(ind);
       }
 
-      d.append(title,x,icons);
+      const icons=document.createElement("div");
+      icons.className="icons";
+
+      if(card.checklist.length){
+        let ck=document.createElement("span");
+        ck.innerText="☑";
+        ck.className="icon";
+        ck.onclick=()=>openChecklist(card);
+        icons.appendChild(ck);
+      }
+
+      let del=document.createElement("span");
+      del.innerText="✖";
+      del.className="icon";
+      del.onclick=()=>{
+        col.cards.splice(idx,1);
+        save();render();
+      };
+      icons.appendChild(del);
+
+      d.appendChild(icons);
+
+      const t=col.title.toLowerCase();
+      if(t.includes("concluído")) d.classList.add("green","stripe-green");
+      if(t.includes("andamento")) d.classList.add("yellow","stripe-yellow");
+      if(card.title.includes("AdmK")) d.classList.add("blue");
+
       cards.appendChild(d);
     });
 
-    const btn=document.createElement("button");
-    btn.textContent="+ Tarefa";
-    btn.onclick=()=>addCard(col);
+    let btn=document.createElement("button");
+    btn.innerText="+ Card";
+    btn.onclick=()=>{
+      col.cards.push({title:"Nova tarefa",checklist:[],created:new Date()});
+      save();render();
+    };
 
-    c.append(cards,btn);
+    c.appendChild(h);
+    c.appendChild(cards);
+    c.appendChild(btn);
     board.appendChild(c);
   });
 }
 
+addColumn.onclick=()=>{
+  if(state.columns.length>=25)return alert("Máx 25 colunas");
+  state.columns.push({title:"Nova coluna",cards:[]});
+  save();render();
+};
+
+function openChecklist(card){
+  activeCard=card;
+  checklist.innerHTML="";
+  card.checklist.forEach((c,i)=>{
+    let l=document.createElement("div");
+    let cb=document.createElement("input");
+    cb.type="checkbox";
+    cb.checked=c.done;
+    cb.onchange=e=>{
+      c.done=e.target.checked;
+      save();render();
+    };
+    l.appendChild(cb);
+    l.appendChild(document.createTextNode(" "+c.text));
+    checklist.appendChild(l);
+  });
+  modal.style.display="flex";
+}
+
+function addCheck(){
+  if(newCheck.value){
+    activeCard.checklist.push({text:newCheck.value,done:false});
+    newCheck.value="";
+    save();render();
+    openChecklist(activeCard);
+  }
+}
+
+function closeModal(){modal.style.display="none"}
+
 render();
 </script>
-
 </body>
 </html>
